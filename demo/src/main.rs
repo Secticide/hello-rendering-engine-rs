@@ -54,7 +54,7 @@ impl Default for ResourceHandle {
 pub struct ShaderResource(ResourceHandle);
 
 impl ShaderResource {
-    // Capitalised 'Self' refers to the type name, it is shorthand
+    // Capitalised 'Self' refers to the type name, it is a shorthand
     pub fn new(shader_stage: GLenum) -> Self {
         let handle = unsafe { gl::CreateShader(shader_stage) };
         Self(ResourceHandle(handle))
@@ -65,7 +65,7 @@ impl ShaderResource {
 }
 
 // In Rust, we don't explictly have destructors. The 'Drop' trait provides a way to create RAII style types,
-// giving types which obtain a resource at initialisation time a change to clean up 
+// giving types which obtain a resource at initialisation time a chance to clean up
 impl Drop for ShaderResource {
     fn drop(&mut self) {
         unsafe{ gl::DeleteShader(self.0.index()) }
@@ -100,10 +100,10 @@ fn main() {
     // - Calling 'Result::<T>::unwrap' on an error will abort the program, 'unwrap' is generally used to get a program up and running quickly
     let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
 
-    // Create the window and event handler (currently discarding the event handler using the '_' underscore character)
+    // Create the window and event handler (the event handler is currently being discarded using the '_' underscore character)
     // - Calls 'glfwCreateWindow' internally
     // - This function returns a Rust 'Option' which is synonymous with C++17's 'std::optional'
-    // - The 'Option::<T>::expect' function here will abort the program on failure to create the window
+    // - The 'Option::<T>::expect' function will abort the program on failure to create the window
     let (mut window, _) = glfw.create_window(800, 600, "Hello GLFW", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window");
 
@@ -136,7 +136,7 @@ fn main() {
     ];
 
     // Similarly to functions - any statement without a semi-colon can return
-    // - Here we are returning a tuple / pair and using "structured bindings" (at least that what you'd call it in C++) to bind them to the variables
+    // - Here we are returning a tuple / pair and decomposing the individual elements of the pair (similar to C++17's structured bindings)
     // - You can use tuples like this to return from functions too
     // - This is a decent pattern if you want to setup a variable but keep it const after (note that vao and vbo inside the unsafe block are mutable)
     let (vbo, vao) = unsafe {
@@ -157,6 +157,8 @@ fn main() {
         (vbo, vao)
     };
 
+    // Our first usage of 'unsafe', this is required since all of the C 'gl' functions are marked unsafe
+    // - The main reason for this is that they do not satisfy the memory safety rules Rust enforces
     unsafe {
         gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (size_of::<f32>() * 3) as GLsizei, std::ptr::null());
         gl::EnableVertexAttribArray(0);
@@ -167,12 +169,8 @@ fn main() {
 
     // The core program loop
     // - Calls 'glfwWindowShouldClose' internally
-    // - 'while' loops, 'if' statements and 'for' loops all do not require brackets for the condition
+    // - 'while' loops, 'if' statements and 'for' loops all do not require braces for the condition
     while !window.should_close() {
-
-        // Our first usage of 'unsafe'
-        // - This is requires since the 'gl::ClearColor' function is an unsafe 'C' call
-        // - It is unsafe since it does not satisfy the memory safety rules Rust enforces
         unsafe{
             gl::ClearColor(0.2, 0.3, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
@@ -187,6 +185,7 @@ fn main() {
         glfw.poll_events(); // 'glfwPollEvents'
     }
 
+    // Clean up after ourselves
     unsafe {
         gl::DeleteVertexArrays(1, &vao);
         gl::DeleteBuffers(1, &vbo);
@@ -217,7 +216,7 @@ unsafe fn check_success(shader: GLuint, status: GLenum, get_status: GetStatusFn,
 }
 
 // For these checking functions we're returning a 'Result<(), String>', the '()' is effectively Rusts "void" type - we're simply using
-// the 'Ok' side of the result to signify success
+// the 'Ok' side of the result to signal success
 // - Note: at the end of the 'check_status' call; we're using a '?' which is effectively a 'try-return'
 //         this means if 'check_status' returns 'Ok' continue as normal, but if 'Err(String)' is returned:
 //         return that error from this function. The error types must be the same.
