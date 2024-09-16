@@ -209,6 +209,16 @@ unsafe fn check_success(shader: GLuint, status: GLenum, get_status: GetStatusFn,
         let mut buffer: [GLchar; 512] = [0; 512];
         let mut length: GLsizei = 0;
         get_info(shader, buffer.len() as GLsizei, &mut length, buffer.as_mut_ptr());
+
+        // This line looks a little wild but makes sense if you understand Rust types, here is a summary of what is happening:
+        // - CStr is as previously mentioned a C-string view, meaning it has a null terminator and is an array of single byte characters
+        // - We create the CStr from the buffer pointer created above, this will scan for the null terminator
+        // - There are a few other ways to do this (especially since we have the length above, but this is the safest)
+        // - We then convert the C-string view into a Rust string view or 'str'
+        // - Rust strings contain variable width characters and so a direct conversion can fail (and so 'CStr::to_str' returns a Result)
+        // - We know that 'gl::GetShaderInfoLog' and 'gl::GetProgramInfoLog' will return a valid string and so unwrapping here is safe
+        // - We then call 'to_owned' to get the full Rust string (which is similar to converting a 'std::string_view' to a 'std::string')
+        // - This is then returned as the error
         Err(CStr::from_ptr(buffer.as_ptr()).to_str().unwrap().to_owned())
     } else {
         Ok(())
