@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 glfw = "0.58.0"
 gl = "0.14.0"
+avocet = { path = "../avocet" }
