@@ -4,11 +4,7 @@ use glfw::{self, Context};
 use gl::{self, types::*};
 
 // Using this syntax we can choose symbols to import
-use avocet::graphics::opengl::{
-    ShaderStage,
-    ShaderCompiler,
-    check_linking_success,
-};
+use avocet::graphics::opengl::ShaderProgram;
 
 // This is essentially a C++ 'static const char*', '&CStr' is a C-string-view and the 'static is referring to the lifetime
 static VERTEX_SHADER_SOURCE: &'static CStr = c"
@@ -41,18 +37,7 @@ fn main() {
     gl::load_with(|symbol_name| window.get_proc_address(symbol_name));
 
     // Build and compile shaders
-    let vertex_shader = ShaderCompiler::new(ShaderStage::Vertex, VERTEX_SHADER_SOURCE).unwrap();
-    let fragment_shader  = ShaderCompiler::new(ShaderStage::Fragment, FRAGMENT_SHADER_SOURCE).unwrap();
-
-    // Link shaders
-    let shader_program = unsafe {
-        let program = gl::CreateProgram();
-        gl::AttachShader(program, vertex_shader.resource().handle().index());
-        gl::AttachShader(program, fragment_shader.resource().handle().index());
-        gl::LinkProgram(program);
-        check_linking_success(program).unwrap();
-        program
-    };
+    let shader_program = ShaderProgram::new(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE).unwrap();
 
     // Set up vertex data and configure vertex attributes
     let vertices: [f32; 9] = [
@@ -94,7 +79,7 @@ fn main() {
             gl::ClearColor(0.2, 0.3, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
-            gl::UseProgram(shader_program);
+            shader_program.bind();
             gl::BindVertexArray(vao);
             gl::DrawArrays(gl::TRIANGLES, 0, 3);
         };
@@ -107,6 +92,5 @@ fn main() {
     unsafe {
         gl::DeleteVertexArrays(1, &vao);
         gl::DeleteBuffers(1, &vbo);
-        gl::DeleteProgram(shader_program);
     };
 }

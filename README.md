@@ -17,6 +17,11 @@ cd hello-rendering-engine-rs
 cargo run
 ```
 
+## Additional Lecture Notes
+
+When translating the lecture content over to Rust, some of the lectures have brought up several options for how to tackle the problems surfaced. The following is a listing of the notes made for specific lectures:
+- [Lecture 7: Variadic Generics](NOTES.md#lecture-7-variadic-generics)
+
 ## Links and Resources
 
 If you're interested in learning Rust, reading the [Rust Book](https://doc.rust-lang.org/book/) is a great starting point!
