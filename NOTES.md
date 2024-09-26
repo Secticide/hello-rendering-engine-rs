@@ -152,13 +152,13 @@ shader_resource!{
 }
 
 shader_resource!{
-    struct ShaderResource(ResourceHandle) {
-        fn new(stage: ShaderStage) -> Self {
-            Self(ResourceHandle(unsafe{ gl::CreateShader(stage as GLenum) }))
+    struct ShaderProgramResource(ResourceHandle) {
+        fn new() -> Self {
+            Self(ResourceHandle(unsafe{ gl::CreateProgram() }))
         }
 
         fn drop(handle: &ResourceHandle) {
-            unsafe{ gl::DeleteShader(handle.index()) };
+            unsafe{ gl::DeleteProgram(handle.index()); }
         }
     }
 }
