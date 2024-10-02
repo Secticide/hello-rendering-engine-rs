@@ -1,4 +1,7 @@
-use std::ffi::CStr;
+use std::{
+    io::{Result, Error, ErrorKind},
+    path::Path,
+};
 use gl::types::*;
 
 // ------------------------------------------------------------------------------------------
@@ -8,40 +11,6 @@ pub struct ResourceHandle(pub(crate) GLuint);
 
 impl ResourceHandle {
     #[must_use] pub fn index(&self) -> GLuint { self.0 }
-}
-
-// ------------------------------------------------------------------------------------------
-
-#[derive(PartialEq, Eq)]
-pub struct ShaderProgram(ShaderProgramResource);
-
-impl ShaderProgram {
-    pub fn new(vertex_source: &CStr, fragment_source: &CStr) -> Option<Self> {
-        let vertex_shader = ShaderCompiler::new(ShaderStage::Vertex, vertex_source)?;
-        let fragment_shader = ShaderCompiler::new(ShaderStage::Fragment, fragment_source)?;
-
-        let program = Self(ShaderProgramResource::new());
-        let program_index = program.resource().handle().index();
-
-        {
-            let _vertex_attacher = ShaderAttacher::new(&program, &vertex_shader);
-            let _fragment_attacher = ShaderAttacher::new(&program, &fragment_shader);
-            unsafe{ gl::LinkProgram(program_index); }
-        }        
-
-        if let Err(message) = unsafe{ check_linking_success(program_index) } {
-            eprintln!("Failed to link shader program: {}", message);
-            None
-        } else {
-            Some(program)
-        }
-    }
-
-    #[must_use] fn resource(&self) -> &ShaderProgramResource { return &self.0; }
-
-    pub fn bind(&self) {
-        unsafe{ gl::UseProgram(self.0.handle().index()); }
-    }
 }
 
 // ------------------------------------------------------------------------------------------
@@ -57,24 +26,60 @@ enum ShaderStage {
 struct ShaderCompiler(ShaderResource);
 
 impl ShaderCompiler {
-    fn new(stage: ShaderStage, source: &CStr) -> Option<Self> {
+    fn new(stage: ShaderStage, path: &Path) -> Result<Self> {
+        let source = std::fs::read_to_string(path)?;
         let resource = ShaderResource::new(stage);
         let shader = resource.handle().index();
         
         unsafe{
-            gl::ShaderSource(shader, 1, &source.as_ptr(), std::ptr::null());
+            let length = source.len() as GLint;
+            gl::ShaderSource(shader, 1, &(source.as_ptr() as *const GLchar), &length);
             gl::CompileShader(shader);
         };
 
-        if let Err(message) = unsafe{ check_compilation_success(shader) } {
-            eprintln!("Failed to compile {:?} shader: {}", stage, message);
-            None
+        if let Err(error) = check_build_success(&resource) {
+            eprint!("{}", error);
+            Err(Error::new(ErrorKind::InvalidData, "Failed to build resource."))
         } else {
-            Some(Self(resource))
+            Ok(Self(resource))
         }
     }
 
     #[must_use] fn resource(&self) -> &ShaderResource { &self.0 }
+}
+
+// ------------------------------------------------------------------------------------------
+
+#[derive(PartialEq, Eq)]
+pub struct ShaderProgram(ShaderProgramResource);
+
+impl ShaderProgram {
+    pub fn new<P: AsRef<Path>>(vertex_path: P, fragment_path: P) -> Result<Self> {
+        let vertex_shader = ShaderCompiler::new(ShaderStage::Vertex, vertex_path.as_ref())?;
+        let fragment_shader = ShaderCompiler::new(ShaderStage::Fragment, fragment_path.as_ref())?;
+
+        let program = Self(ShaderProgramResource::new());
+        let program_index = program.resource().handle().index();
+
+        {
+            let _vertex_attacher = ShaderAttacher::new(&program, &vertex_shader);
+            let _fragment_attacher = ShaderAttacher::new(&program, &fragment_shader);
+            unsafe{ gl::LinkProgram(program_index); }
+        }
+
+        if let Err(error) = check_build_success(program.resource()) {
+            eprint!("{}", error);
+            Err(Error::new(ErrorKind::InvalidData, "Failed to build resource."))
+        } else {
+            Ok(program)
+        }
+    }
+
+    #[must_use] fn resource(&self) -> &ShaderProgramResource { return &self.0; }
+
+    pub fn bind(&self) {
+        unsafe{ gl::UseProgram(self.0.handle().index()); }
+    }
 }
 
 struct ShaderAttacher {
@@ -120,6 +125,12 @@ macro_rules! shader_resource {
             #[must_use] $struct_vis fn handle(&self) -> &ResourceHandle { &self.0 }
         }
 
+        impl AsRef<ResourceHandle> for $name {
+            fn as_ref(&self) -> &ResourceHandle {
+                &self.0
+            }
+        }
+
         impl Drop for $name {
             fn drop(&mut self) {
                 let $handle: &ResourceHandle = &self.0;
@@ -141,6 +152,16 @@ shader_resource!{
     }
 }
 
+impl BuiltResource for ShaderResource {
+    #[inline(always)] fn build_stage() -> &'static str { "compilation" }
+    #[inline(always)] fn status_flag() -> GLenum { gl::COMPILE_STATUS }
+
+    #[inline(always)] fn get_parameter_fn(&self) -> GetStatusFn { gl::GetShaderiv }
+    #[inline(always)] fn get_info_log_fn(&self) -> GetInfoFn { gl::GetShaderInfoLog }
+
+    #[inline(always)] fn name() -> &'static str { "shader" }
+}
+
 shader_resource!{
     struct ShaderProgramResource(ResourceHandle) {
         fn new() -> Self {
@@ -153,39 +174,54 @@ shader_resource!{
     }
 }
 
+impl BuiltResource for ShaderProgramResource {
+    #[inline(always)] fn build_stage() -> &'static str { "linking" }
+    #[inline(always)] fn status_flag() -> GLenum { gl::LINK_STATUS }
+
+    #[inline(always)] fn get_parameter_fn(&self) -> GetStatusFn { gl::GetProgramiv }
+    #[inline(always)] fn get_info_log_fn(&self) -> GetInfoFn { gl::GetProgramInfoLog }
+
+    #[inline(always)] fn name() -> &'static str { "program" }
+}
+
 // ------------------------------------------------------------------------------------------
 
 type GetStatusFn = unsafe fn(GLuint, GLenum, *mut GLint);
 type GetInfoFn = unsafe fn(GLuint, GLsizei, *mut GLsizei, *mut GLchar);
 
-unsafe fn check_status(shader: GLuint, status: GLenum, get_status: GetStatusFn) -> bool {
-    let mut success: GLint = 0;
-    get_status(shader, status, &mut success);
-    success as u8 == gl::TRUE
+trait BuiltResource: AsRef<ResourceHandle> {
+    fn build_stage() -> &'static str;
+    fn status_flag() -> GLenum;
+    fn get_parameter_fn(&self) -> GetStatusFn;
+    fn get_info_log_fn(&self) -> GetInfoFn;
+    fn name() -> &'static str;
 }
 
-unsafe fn check_success(shader: GLuint, status: GLenum, get_status: GetStatusFn, get_info: GetInfoFn) -> Result<(), String> {
-    if !check_status(shader, status, get_status) {
-        let mut length: GLint = 0;
-        get_status(shader, gl::INFO_LOG_LENGTH, &mut length);
-        let length = length as usize; // Shadowing variable name to another type
+fn get_parameter_value<T: BuiltResource>(resource: &T, parameter_id: GLenum) -> GLint {
+    let mut param = 0;
+    unsafe{
+        resource.get_parameter_fn()(resource.as_ref().index(), parameter_id, &mut param);
+    }
+    param
+}
 
-        let mut buffer: Vec<u8> = Vec::with_capacity(length);
-        get_info(shader, length as GLsizei, std::ptr::null_mut(), buffer.as_mut_ptr() as *mut _);
-        buffer.set_len(length - 2); // Unsafe function to set the length since we know how many characters have been written
+fn get_info_log<T: BuiltResource>(resource: &T) -> String {
+    let length = get_parameter_value(resource, gl::INFO_LOG_LENGTH) as usize;
 
-        Err(String::from_utf8_unchecked(buffer))
+    let mut buffer: Vec<u8> = Vec::with_capacity(length);
+    let result = unsafe{
+        resource.get_info_log_fn()(resource.as_ref().index(), length as GLsizei, std::ptr::null_mut(), buffer.as_mut_ptr() as *mut _);
+        buffer.set_len(length);
+        String::from_utf8_unchecked(buffer)
+    };
+
+    result
+}
+
+fn check_build_success<T: BuiltResource>(resource: &T) -> std::result::Result<(), String> {
+    if get_parameter_value(resource, T::status_flag()) == gl::FALSE as GLint {
+        Err(format!("Error {} {} failed:\n{}", T::name(), T::build_stage(), get_info_log(resource)))
     } else {
         Ok(())
     }
-}
-
-unsafe fn check_compilation_success(shader: GLuint) -> Result<(), String> {
-    check_success(shader, gl::COMPILE_STATUS, gl::GetShaderiv, gl::GetShaderInfoLog)?;
-    Ok(())
-}
-
-unsafe fn check_linking_success(program: GLuint) -> Result<(), String> {
-    check_success(program, gl::LINK_STATUS, gl::GetProgramiv, gl::GetProgramInfoLog)?;
-    Ok(())
 }

@@ -1,43 +1,40 @@
-use std::ffi::CStr;
+use std::path::PathBuf;
 
 use glfw::{self, Context};
 use gl::{self, types::*};
 
-// Using this syntax we can choose symbols to import
 use avocet::graphics::opengl::ShaderProgram;
 
-// This is essentially a C++ 'static const char*', '&CStr' is a C-string-view and the 'static is referring to the lifetime
-static VERTEX_SHADER_SOURCE: &'static CStr = c"
-#version 330 core
-layout (location = 0) in vec3 aPos;
-void main() {
-    gl_Position = vec4(aPos.xyz, 1.0);
-}";
+mod util;
+use util::WindowManager;
 
-// Multiline literals!
-static FRAGMENT_SHADER_SOURCE: &'static CStr = c"
-#version 330 core
-out vec4 FragColor;
-void main() {
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-}";
+fn get_shader_path(filename: &str) -> PathBuf {
+    const CARGO_MANIFEST_DIR: &'static str = std::env!("CARGO_MANIFEST_DIR");
+    const SHADERS_DIR_NAME: &'static str = "shaders";
+
+    let directory_separator_count = 2;
+    let mut path = PathBuf::with_capacity(
+        CARGO_MANIFEST_DIR.len() +
+        SHADERS_DIR_NAME.len() +
+        directory_separator_count +
+        filename.len());
+    
+    path.push(CARGO_MANIFEST_DIR);
+    path.push(SHADERS_DIR_NAME);
+    path.push(filename);
+
+    path
+}
 
 fn main() {
-    // Initialise GLFW
-    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
-
-    // Create the window and event handler
-    let (mut window, _) = glfw.create_window(800, 600, "Hello GLFW", glfw::WindowMode::Windowed)
+    let mut window_manager = WindowManager::new();
+    let (mut window, _) = window_manager.create_window(800, 600, "Hello GLFW")
         .expect("Failed to create GLFW window");
 
-    window.set_key_polling(true); // 'glfwSetKeyCallback'
-    window.make_current(); // 'glfwMakeContextCurrent'
-
-    // 'gl' is a OpenGL loader (similar to GLAD)
-    gl::load_with(|symbol_name| window.get_proc_address(symbol_name));
-
     // Build and compile shaders
-    let shader_program = ShaderProgram::new(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE).unwrap();
+    let vertex_path = get_shader_path("vert_identity.hlsl");
+    let fragment_path = get_shader_path("frag_monochrome.hlsl");
+    let shader_program = ShaderProgram::new(vertex_path, fragment_path).unwrap();
 
     // Set up vertex data and configure vertex attributes
     let vertices: [f32; 9] = [
@@ -85,7 +82,7 @@ fn main() {
         };
 
         window.swap_buffers(); // 'glfwSwapBuffers'
-        glfw.poll_events(); // 'glfwPollEvents'
+        window_manager.poll_events(); // 'glfwPollEvents'
     }
 
     // Clean up after ourselves
