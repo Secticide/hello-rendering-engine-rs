@@ -1,21 +1,21 @@
 # Notes & Explanations
 
-This file is intended to be linked to from the main readme to explain a bit more about decisions made while going through the process of building out this rendering engine.
+This document contains descriptions and expanded explanations to a number of Rust specific code design decisions. The repository readme references this document where additional detail is deemed necessary or interesting.
 
 ## Lecture 7: Variadic Generics
 
-In C++; you have variadic template parameters and packs:
+Variadic template arguments has been a C++ feature since C++11:
 ```cpp
 struct shader_resource {
     template<typename ...Args>
     static resource_handle create(Args&&... args) { ... }
 };
 ```
-We don't have the same setup in Rust - there just isn't variadic generics. There are number of options we have to solve the same problem. The main two ways of resolving the issue are as follows:
+Unfortunately Rust's generics doesn't _currently_ support variadic arguments. There are however a number of options we have to emulate similar functionality. The two best options available are as follows:
 1. Associated types with traits
 2. Rust Macro expansion
 
-Associated types with traits is another simple solution, but it comes with it's own set of issues, here is en example of what I am talking about:
+Trait defined associated types offers a simple way for a trait implementor to define a type which can then be used as the parameter for the _new_ function:
 ```rs
 // A trait is very similar to a C++20 concept
 pub trait ResourceLifecycle: Sized {
@@ -88,9 +88,9 @@ impl ResourceLifecycle for ShaderResourceLifecycle {
 pub type ShaderResource = GenericShaderResource<ShaderResourceLifecycle>;
 ```
 
-Macro expansion a simple way to write something once and generate code, the best thing about Rust macros is that they are type checked too, and they are powerful enough to write domain specific languages.
+The other core option is to use Rust's macro system. Most people who have used C or C++'s preprocessor _macro_ system are likely to wince or be generally dismissive when macros are suggested as a solution to a problem. However, Rust's macros aim to solve a number of issues present with C and C++'s preprocessor.
 
-This is the path I ended up going down - at least until Rust natively supports variadic arguments:
+After careful consideration, and with the fact that this project is intended for educational purposes; I elected to move forward with the macro approach:
 ```rs
 // 'macro_rules!' is how we define a macro
 macro_rules! shader_resource {
