@@ -28,7 +28,31 @@ fn check_for_basic_errors() {
     }
 }
 
+#[repr(u8)]
+pub enum BuildMode {
+    Debug,
+    Release
+}
+
+impl BuildMode {
+    // Currently, Rust's traits don't support const functions
+    pub const fn equals(self, rhs: BuildMode) -> bool { self as u8 == rhs as u8 }
+}
+
+#[cfg(debug_assertions)]
+const BUILD_MODE: BuildMode = BuildMode::Debug;
+
+#[cfg(not(debug_assertions))]
+const BUILD_MODE: BuildMode = BuildMode::Release;
+
+pub const fn build_mode() -> BuildMode { BUILD_MODE }
+pub const fn is_debug_mode() -> bool { BUILD_MODE.equals(BuildMode::Debug) }
+pub const fn is_release_mode() -> bool { BUILD_MODE.equals(BuildMode::Release) }
+
 pub fn gl_function<F: FnMut()>(mut f: F) {
     f();
-    check_for_basic_errors();
+
+    if const { is_debug_mode() } {
+        check_for_basic_errors();
+    }
 }
