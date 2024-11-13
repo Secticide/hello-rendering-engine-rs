@@ -29,7 +29,14 @@ fn get_shader_path(filename: &str) -> PathBuf {
 }
 
 fn main() {
-    let mut window_manager = WindowManager::new();
+    let mut window_manager = match WindowManager::new() {
+        Ok(wm) => wm,
+        Err(init_error) => {
+            eprintln!("Failed to initialise: {:?}", init_error);
+            return;
+        },
+    };
+
     let (mut window, _) = window_manager.create_window(800, 600, "Hello Rendering Engine")
         .expect("Failed to create GLFW window");
 

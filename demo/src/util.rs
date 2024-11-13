@@ -1,17 +1,35 @@
 use glfw::{ Context, Glfw, GlfwReceiver, OpenGlProfileHint, PWindow, WindowEvent, WindowHint };
 use avocet::{ version, validation::ValidationMode };
 
-pub struct WindowManager{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitError {
+    InitialiseGlfw(glfw::InitError),
+    RetrieveOpenGLVersion,
+}
+
+impl From<glfw::InitError> for InitError {
+    fn from(value: glfw::InitError) -> Self {
+        Self::InitialiseGlfw(value)
+    }
+}
+
+pub struct WindowManager {
     glfw: Glfw,
     version: version::OpenGLVersion,
 }
 
 impl WindowManager {
-    pub fn new() -> Self {
-        let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
-        let version = find_opengl_version(&mut glfw);
+    pub fn new() -> Result<Self, InitError> {
+        let mut glfw = match glfw::init(glfw::fail_on_errors) {
+            Ok(glfw) => glfw,
+            Err(init_error) => return Err(init_error.into()),
+        };
 
-        Self { glfw, version }
+        if let Some(version) = find_opengl_version(&mut glfw) {
+            Ok(Self { glfw, version })
+        } else {
+            Err(InitError::RetrieveOpenGLVersion)
+        }
     }
 
     pub fn create_window(&mut self, width: u32, height: u32, title: &str) -> Option<(PWindow, GlfwReceiver<(f64, WindowEvent)>)> {
@@ -51,20 +69,28 @@ impl WindowManager {
     }
 }
 
-fn find_opengl_version(glfw: &mut Glfw) -> version::OpenGLVersion {
+fn find_opengl_version(glfw: &mut Glfw) -> Option<version::OpenGLVersion> {
     // When looking into how GLFW works - when requesting a specific context version
     // it will lock-in on the requested version. Ideally we want the highest version
     // supported by the platform. This is done by not supplying a context version hint.
 
+    // The above comment makes sense for Windows and Linux
+    // On Mac, if now hint is provided; the driver defaults to 2.1
+    // As such we specifically ask for 4.1 on Mac
+    if const { avocet::config::is_mac() } {
+        glfw.window_hint(WindowHint::ContextVersion(4, 1));
+    }
+
     // We create a hidden window to create a context and retrieve the OpenGL version
     glfw.window_hint(WindowHint::Visible(false));
 
-    let (mut window, _) = glfw.create_window(1024, 768, "", glfw::WindowMode::Windowed)
-        .expect("Failed to create GLFW Window");
-    window.make_current();
+    if let Some((mut window, _)) = glfw.create_window(1, 1, "", glfw::WindowMode::Windowed) {
+        window.make_current();
+        gl::load_with(|symbol_name| window.get_proc_address(symbol_name));
+        glfw.default_window_hints();
 
-    gl::load_with(|symbol_name| window.get_proc_address(symbol_name));
-
-    glfw.default_window_hints();
-    version::get_opengl_version()
+        Some(version::get_opengl_version())
+    } else {
+        None
+    }
 }
