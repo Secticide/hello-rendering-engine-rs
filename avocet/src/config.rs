@@ -47,7 +47,7 @@ const TARGET_PLATFORM: TargetPlatform = TargetPlatform::Windows;
 const TARGET_PLATFORM: TargetPlatform = TargetPlatform::Mac;
 
 #[cfg(target_os = "linux")]
-const TARGET_PLATFORM: TargetPlatform = TargetPlatform::Mac;
+const TARGET_PLATFORM: TargetPlatform = TargetPlatform::Linux;
 
 /// Retrieve the current target platform
 pub const fn target_platform() -> TargetPlatform { TARGET_PLATFORM }
