@@ -33,6 +33,13 @@ fn main() {
     let (mut window, _) = window_manager.create_window(800, 600, "Hello Rendering Engine")
         .expect("Failed to create GLFW window");
 
+    println!(
+        "Vendor: {}\nRenderer: {}\nVersion: {}",
+        avocet::version::get_opengl_vendor_string(),
+        avocet::version::get_opengl_renderer_string(),
+        avocet::version::get_opengl_version_string(),
+    );
+
     // Build and compile shaders
     let vertex_path = get_shader_path("vert_identity.hlsl");
     let fragment_path = get_shader_path("frag_monochrome.hlsl");

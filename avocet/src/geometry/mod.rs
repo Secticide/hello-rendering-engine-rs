@@ -1,6 +1,6 @@
 use crate::{
     graphics::opengl::{VAOResource, VBOResource},
-    debugging::gl_function,
+    validation::gl_function,
 };
 
 #[allow(dead_code)]

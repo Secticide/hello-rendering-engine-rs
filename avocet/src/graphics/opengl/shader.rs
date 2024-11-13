@@ -1,6 +1,6 @@
 use crate::{
     graphics::opengl::ResourceHandle,
-    debugging::gl_function,
+    validation::gl_function,
 };
 
 use std::{

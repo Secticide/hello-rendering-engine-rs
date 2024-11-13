@@ -1,6 +1,8 @@
 pub mod graphics;
 pub mod geometry;
-pub mod debugging;
+pub mod validation;
+pub mod config;
+pub mod version;
 
 #[macro_export]
 macro_rules! const_assert {
