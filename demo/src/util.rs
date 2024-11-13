@@ -19,7 +19,7 @@ impl WindowManager {
         self.glfw.window_hint(WindowHint::OpenGlProfile(OpenGlProfileHint::Core));
         self.glfw.window_hint(WindowHint::OpenGlForwardCompat(true));
 
-        // Enable debug context if our validation mode is advanced
+        // Enable debug context if our validation mode is advanced and our selected version supports it
         if avocet::validation::validation_mode() == ValidationMode::Advanced && self.version.supports_debug_message_log() {
             self.glfw.window_hint(WindowHint::OpenGlDebugContext(true));
         }
