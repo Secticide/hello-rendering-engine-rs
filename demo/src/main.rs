@@ -41,8 +41,8 @@ fn main() {
     );
 
     // Build and compile shaders
-    let vertex_path = get_shader_path("vert_identity.hlsl");
-    let fragment_path = get_shader_path("frag_monochrome.hlsl");
+    let vertex_path = get_shader_path("vert_identity.glsl");
+    let fragment_path = get_shader_path("frag_monochrome.glsl");
     let shader_program = agl::ShaderProgram::new(vertex_path, fragment_path).unwrap();
     let triangle = Triangle::new();
 
