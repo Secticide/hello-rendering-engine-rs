@@ -79,6 +79,8 @@ fn find_opengl_version(glfw: &mut Glfw) -> Option<version::OpenGLVersion> {
     // As such we specifically ask for 4.1 on Mac
     if const { avocet::config::is_mac() } {
         glfw.window_hint(WindowHint::ContextVersion(4, 1));
+        glfw.window_hint(WindowHint::OpenGlProfile(OpenGlProfileHint::Core));
+        glfw.window_hint(WindowHint::OpenGlForwardCompat(true));
     }
 
     // We create a hidden window to create a context and retrieve the OpenGL version
