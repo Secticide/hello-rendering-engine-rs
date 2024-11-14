@@ -13,6 +13,20 @@ impl From<glfw::InitError> for InitError {
     }
 }
 
+pub struct WindowConfig {
+    pub width: u32,
+    pub height: u32,
+    pub title: &'static str,
+    pub visible: bool,
+}
+
+impl WindowConfig {
+    #[allow(dead_code)]
+    pub fn hidden() -> Self {
+        Self { width: 1, height: 1, title: "", visible: false }
+    }
+}
+
 pub struct WindowManager {
     glfw: Glfw,
     version: version::OpenGLVersion,
@@ -32,10 +46,14 @@ impl WindowManager {
         }
     }
 
-    pub fn create_window(&mut self, width: u32, height: u32, title: &str) -> Option<(PWindow, GlfwReceiver<(f64, WindowEvent)>)> {
+    pub fn create_window(&mut self, config: WindowConfig) -> Option<(PWindow, GlfwReceiver<(f64, WindowEvent)>)> {
         self.glfw.window_hint(WindowHint::ContextVersion(self.version.major as _, self.version.minor as _));
         self.glfw.window_hint(WindowHint::OpenGlProfile(OpenGlProfileHint::Core));
         self.glfw.window_hint(WindowHint::OpenGlForwardCompat(true));
+
+        if !config.visible {
+            self.glfw.window_hint(WindowHint::Visible(false));
+        }
 
         let validation_mode = avocet::validation::validation_mode();
         if  validation_mode == ValidationMode::Advanced ||
@@ -43,7 +61,8 @@ impl WindowManager {
             self.glfw.window_hint(WindowHint::OpenGlDebugContext(true));
         }
 
-        let (mut window, receiver) = self.glfw.create_window(width, height, title, glfw::WindowMode::Windowed)?;
+        let (mut window, receiver) = 
+            self.glfw.create_window(config.width, config.height, config.title, glfw::WindowMode::Windowed)?;
         window.make_current(); // glfwMakeContextCurrent
 
         // Load OpenGL functions

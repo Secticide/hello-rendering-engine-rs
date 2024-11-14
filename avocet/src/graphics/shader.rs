@@ -1,5 +1,5 @@
 use crate::{
-    graphics::opengl::ResourceHandle,
+    graphics::ResourceHandle,
     validation::gl_function,
 };
 
@@ -34,7 +34,7 @@ impl ShaderCompiler {
 
         if let Err(error) = check_build_success(&resource) {
             eprint!("{}", error);
-            Err(Error::new(ErrorKind::InvalidData, "Failed to build resource."))
+            Err(Error::new(ErrorKind::InvalidData, format!("Failed to build resource ({:?} shader).", stage)))
         } else {
             Ok(Self(resource))
         }
@@ -45,7 +45,7 @@ impl ShaderCompiler {
 
 // ------------------------------------------------------------------------------------------
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ShaderProgram(ShaderProgramResource);
 
 impl ShaderProgram {
@@ -109,7 +109,7 @@ macro_rules! shader_resource {
         }
 
     ) => {
-        #[derive(PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq)]
         $struct_vis struct $name (ResourceHandle);
 
         impl $name {
@@ -150,13 +150,13 @@ shader_resource!{
 }
 
 impl BuiltResource for ShaderResource {
-    #[inline(always)] fn build_stage() -> &'static str { "compilation" }
-    #[inline(always)] fn status_flag() -> GLenum { gl::COMPILE_STATUS }
+    const NAME: &'static str = "shader";
+    const BUILD_STAGE: &'static str = "compilation";
+    const STATUS_FLAG: GLenum = gl::COMPILE_STATUS;
 
     #[inline(always)] fn get_parameter_fn(&self) -> GetStatusFn { gl::GetShaderiv }
     #[inline(always)] fn get_info_log_fn(&self) -> GetInfoFn { gl::GetShaderInfoLog }
 
-    #[inline(always)] fn name() -> &'static str { "shader" }
 }
 
 shader_resource!{
@@ -174,13 +174,13 @@ shader_resource!{
 }
 
 impl BuiltResource for ShaderProgramResource {
-    #[inline(always)] fn build_stage() -> &'static str { "linking" }
-    #[inline(always)] fn status_flag() -> GLenum { gl::LINK_STATUS }
+    const NAME: &'static str = "program";
+    const BUILD_STAGE: &'static str = "linking";
+    const STATUS_FLAG: GLenum = gl::LINK_STATUS;
 
     #[inline(always)] fn get_parameter_fn(&self) -> GetStatusFn { gl::GetProgramiv }
     #[inline(always)] fn get_info_log_fn(&self) -> GetInfoFn { gl::GetProgramInfoLog }
 
-    #[inline(always)] fn name() -> &'static str { "program" }
 }
 
 // ------------------------------------------------------------------------------------------
@@ -189,11 +189,12 @@ type GetStatusFn = unsafe fn(GLuint, GLenum, *mut GLint);
 type GetInfoFn = unsafe fn(GLuint, GLsizei, *mut GLsizei, *mut GLchar);
 
 trait BuiltResource: AsRef<ResourceHandle> {
-    fn build_stage() -> &'static str;
-    fn status_flag() -> GLenum;
+    const NAME: &'static str;
+    const BUILD_STAGE: &'static str;
+    const STATUS_FLAG: GLenum;
+
     fn get_parameter_fn(&self) -> GetStatusFn;
     fn get_info_log_fn(&self) -> GetInfoFn;
-    fn name() -> &'static str;
 }
 
 fn get_parameter_value<T: BuiltResource>(resource: &T, parameter_id: GLenum) -> GLint {
@@ -218,8 +219,8 @@ fn get_info_log<T: BuiltResource>(resource: &T) -> String {
 }
 
 fn check_build_success<T: BuiltResource>(resource: &T) -> std::result::Result<(), String> {
-    if get_parameter_value(resource, T::status_flag()) == gl::FALSE as GLint {
-        Err(format!("Error {} {} failed:\n{}", T::name(), T::build_stage(), get_info_log(resource)))
+    if get_parameter_value(resource, T::STATUS_FLAG) == gl::FALSE as GLint {
+        Err(format!("Error {} {} failed:\n{}", T::NAME, T::BUILD_STAGE, get_info_log(resource)))
     } else {
         Ok(())
     }

@@ -1,5 +1,5 @@
 use crate::{
-    graphics::opengl::{VAOResource, VBOResource},
+    graphics::{VAOResource, VBOResource},
     validation::gl_function,
 };
 

@@ -1,14 +1,17 @@
-use std::path::PathBuf;
+mod util;
 
+#[cfg(test)]
+mod tests;
+
+use std::path::PathBuf;
 use glfw::{self, Context};
 
 use avocet::{
-    graphics::opengl as agl,
+    graphics as ag,
     geometry::Triangle,
 };
 
-mod util;
-use util::WindowManager;
+use util::{WindowConfig, WindowManager};
 
 fn get_shader_path(filename: &str) -> PathBuf {
     const CARGO_MANIFEST_DIR: &'static str = std::env!("CARGO_MANIFEST_DIR");
@@ -37,8 +40,12 @@ fn main() {
         },
     };
 
-    let (mut window, _) = window_manager.create_window(800, 600, "Hello Rendering Engine")
-        .expect("Failed to create GLFW window");
+    let (mut window, _receiver) = window_manager.create_window(WindowConfig{
+        width: 800,
+        height: 600,
+        title: "Hello Rendering Engine",
+        visible: true,
+    }).expect("Failed to create GLFW window");
 
     println!(
         "Vendor: {}\nRenderer: {}\nVersion: {}",
@@ -48,9 +55,9 @@ fn main() {
     );
 
     // Build and compile shaders
-    let vertex_path = get_shader_path("vert_identity.glsl");
-    let fragment_path = get_shader_path("frag_monochrome.glsl");
-    let shader_program = agl::ShaderProgram::new(vertex_path, fragment_path).unwrap();
+    let vertex_path = get_shader_path("identity_vert.glsl");
+    let fragment_path = get_shader_path("monochrome_frag.glsl");
+    let shader_program = ag::ShaderProgram::new(vertex_path, fragment_path).unwrap();
     let triangle = Triangle::new();
 
     // The core program loop
